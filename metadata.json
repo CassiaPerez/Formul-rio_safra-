@@ -1,0 +1,7 @@
+{
+  "name": "AgroTech Safra Control",
+  "description": "Sistema de controle de status de safra com histórico técnico e geolocalização.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
