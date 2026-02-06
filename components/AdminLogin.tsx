@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { Lock, User, KeyRound, ShieldCheck } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Lock, User, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
+import { supabase } from '../services/supabase';
 
 interface AdminLoginProps {
   onLoginSuccess: () => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,29 +18,24 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Verifica as credenciais na tabela 'admins' do Supabase
+      const { data, error: dbError } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password) // Nota: Em produção real, use hash ou Supabase Auth
+        .single();
 
-      if (signInError) {
-        setError('Credenciais inválidas. Tente novamente.');
-        setIsLoading(false);
-        return;
+      if (dbError || !data) {
+        setError('Credenciais inválidas ou usuário não encontrado.');
+      } else {
+        // Login bem-sucedido
+        onLoginSuccess();
       }
-
-      const isAdmin = data.user?.user_metadata?.is_admin === true;
-
-      if (!isAdmin) {
-        await supabase.auth.signOut();
-        setError('Acesso negado. Esta área é restrita para administradores.');
-        setIsLoading(false);
-        return;
-      }
-
-      onLoginSuccess();
     } catch (err) {
-      setError('Erro ao fazer login. Tente novamente.');
+      console.error(err);
+      setError('Erro de conexão ao validar login.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -70,8 +65,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
 
         <form onSubmit={handleLogin} className="p-8 space-y-6">
           {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm flex items-center gap-2 border border-red-100">
-              <Lock size={16} />
+            <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm flex items-center gap-2 border border-red-100 animate-pulse">
+              <AlertCircle size={16} />
               {error}
             </div>
           )}
@@ -82,11 +77,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
                 <User size={18} />
               </div>
               <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-agro-500 focus:ring-agro-500 sm:text-sm px-3 py-3 border bg-white text-gray-900"
+                type="text"
+                placeholder="Usuário"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-agro-500 focus:ring-agro-500 sm:text-sm px-3 py-3 border bg-white text-gray-900 transition-colors"
                 autoFocus
               />
             </div>
@@ -100,24 +95,24 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
                 placeholder="Senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-agro-500 focus:ring-agro-500 sm:text-sm px-3 py-3 border bg-white text-gray-900"
+                className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-agro-500 focus:ring-agro-500 sm:text-sm px-3 py-3 border bg-white text-gray-900 transition-colors"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={isLoading || !email || !password}
+            disabled={isLoading || !username || !password}
             className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-agro-700 hover:bg-agro-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-agro-500 transition-all ${
               isLoading ? 'opacity-70 cursor-wait' : ''
             }`}
           >
             {isLoading ? 'Verificando...' : 'Entrar no Painel'}
           </button>
-
+          
           <div className="text-center">
             <p className="text-xs text-gray-400">
-              Email: admin@agrotech.com / Senha: Admin@2024
+              Banco de dados conectado
             </p>
           </div>
         </form>

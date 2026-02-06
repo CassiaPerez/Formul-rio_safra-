@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, HarvestRecord, TechnicalVisit } from './types';
-import { generateRecordId } from './services/mockData';
-import { fetchCustomers, fetchCrops, fetchHarvestRecords, saveHarvestRecord } from './services/api';
+import { MOCK_CROPS, generateRecordId } from './services/mockData';
+import { fetchCustomers } from './services/api';
+import { recordService } from './services/recordService';
 import { Input, Select } from './components/Input';
 import { HistorySection } from './components/HistorySection';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
 import { Sidebar } from './components/Sidebar';
-import { MapPin, Save, Building2, Map, Share2, Menu, X, Sprout } from 'lucide-react';
-import { supabase } from './lib/supabase';
+import { MapPin, Save, Building2, Map, Share2, Menu, X, Sprout, Loader2 } from 'lucide-react';
 
 // Initial empty state for new form
 const INITIAL_RECORD: HarvestRecord = {
@@ -40,48 +40,44 @@ const App: React.FC = () => {
 
   // Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [crops, setCrops] = useState<{ id: string; name: string }[]>([]);
-
+  const [submittedRecords, setSubmittedRecords] = useState<HarvestRecord[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
+  
   // Form State
   const [record, setRecord] = useState<HarvestRecord>(INITIAL_RECORD);
   const [isLoadingLoc, setIsLoadingLoc] = useState(false);
   const [isLoadingCprf, setIsLoadingCprf] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Validation State
-  const [submittedRecords, setSubmittedRecords] = useState<HarvestRecord[]>([]);
-
+  // Load Initial Data
   useEffect(() => {
+    // Generate initial ID
     setRecord(prev => ({ ...prev, recordNumber: generateRecordId() }));
-
+    
     const loadData = async () => {
-      const [customersData, cropsData, recordsData] = await Promise.all([
-        fetchCustomers(),
-        fetchCrops(),
-        fetchHarvestRecords()
-      ]);
-      setCustomers(customersData);
-      setCrops(cropsData);
-      setSubmittedRecords(recordsData);
-    };
+      // 1. Customers (External API or Mock)
+      const customerData = await fetchCustomers();
+      setCustomers(customerData);
 
+      // 2. Records (Supabase)
+      await refreshRecords();
+    };
+    
     loadData();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        if (session?.user) {
-          const isAdmin = session.user.user_metadata?.is_admin === true;
-          setIsAdminAuthenticated(isAdmin);
-        } else {
-          setIsAdminAuthenticated(false);
-        }
-      })();
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
   }, []);
+
+  const refreshRecords = async () => {
+    setIsLoadingRecords(true);
+    try {
+      const records = await recordService.getAllRecords();
+      setSubmittedRecords(records);
+    } catch (error) {
+      console.error("Falha ao carregar registros do banco:", error);
+      // Fallback optional: setSubmittedRecords(MOCK_SUBMITTED_RECORDS);
+    } finally {
+      setIsLoadingRecords(false);
+    }
+  };
 
   const handleRecordChange = (field: keyof HarvestRecord, value: string | number) => {
     setRecord(prev => ({ ...prev, [field]: value }));
@@ -130,39 +126,35 @@ const App: React.FC = () => {
     }
 
     setSaveStatus('saving');
-
+    
     try {
       const newRecord = {
         ...record,
-        customerId: 'MANUAL',
         status: 'PENDING' as const,
         submissionDate: new Date().toISOString()
       };
 
-      const savedRecord = await saveHarvestRecord(newRecord);
-
-      if (savedRecord) {
-        setSubmittedRecords(prev => [savedRecord, ...prev]);
-        setSaveStatus('saved');
-
-        setTimeout(() => {
-          setSaveStatus('idle');
-          setRecord({ ...INITIAL_RECORD, recordNumber: generateRecordId() });
-          alert("Registro enviado para validação com sucesso!");
-        }, 1500);
-      } else {
+      await recordService.createRecord(newRecord);
+      
+      // Update local list
+      await refreshRecords();
+      
+      setSaveStatus('saved');
+      
+      setTimeout(() => {
         setSaveStatus('idle');
-        alert("Erro ao salvar registro. Tente novamente.");
-      }
+        setRecord({ ...INITIAL_RECORD, recordNumber: generateRecordId() });
+        alert("Registro enviado para validação com sucesso!");
+      }, 1500);
+
     } catch (error) {
-      console.error('Error saving record:', error);
+      console.error("Erro ao salvar:", error);
+      alert("Erro ao salvar no banco de dados. Tente novamente.");
       setSaveStatus('idle');
-      alert("Erro ao salvar registro. Tente novamente.");
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
     setIsAdminAuthenticated(false);
     setCurrentView('form');
   };
@@ -258,11 +250,19 @@ const App: React.FC = () => {
                 {!isAdminAuthenticated ? (
                   <AdminLogin onLoginSuccess={() => setIsAdminAuthenticated(true)} />
                 ) : (
-                  <AdminDashboard
-                    records={submittedRecords}
-                    customers={customers}
-                    crops={crops}
-                  />
+                  <>
+                  {isLoadingRecords ? (
+                    <div className="flex justify-center items-center py-20">
+                      <Loader2 className="animate-spin text-agro-600 w-10 h-10" />
+                    </div>
+                  ) : (
+                    <AdminDashboard 
+                      records={submittedRecords}
+                      customers={customers}
+                      crops={MOCK_CROPS}
+                    />
+                  )}
+                  </>
                 )}
               </>
             )}
@@ -361,7 +361,7 @@ const App: React.FC = () => {
 
                       <Select
                         label="Cultura"
-                        options={crops.map(c => ({ value: c.id, label: c.name }))}
+                        options={MOCK_CROPS.map(c => ({ value: c.id, label: c.name }))}
                         value={record.cropId}
                         onChange={(e) => handleRecordChange('cropId', e.target.value)}
                       />
@@ -443,7 +443,10 @@ const App: React.FC = () => {
                       className={`flex items-center gap-2.5 bg-agro-700 hover:bg-agro-600 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-agro-700/20 transition-all active:scale-95 hover:-translate-y-0.5 ${saveStatus === 'saving' ? 'opacity-80 cursor-wait' : ''}`}
                   >
                       {saveStatus === 'saving' ? (
-                          <>Processando...</>
+                          <>
+                            <Loader2 size={20} className="animate-spin" />
+                            Salvando...
+                          </>
                       ) : (
                           <>
                               <Save size={20} />
