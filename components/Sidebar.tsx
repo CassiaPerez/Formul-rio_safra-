@@ -48,8 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
              />
           </div>
           <div>
-            <h1 className="text-xl font-bold leading-tight tracking-tight text-white">AgroTech</h1>
-            <p className="text-[10px] text-agro-400 font-bold tracking-widest uppercase mt-0.5">Safra Control</p>
+            <h1 className="text-xl font-bold leading-tight tracking-tight text-white">Gestão Safra</h1>
+            <p className="text-[10px] text-agro-400 font-bold tracking-widest uppercase mt-0.5">Sistema de Controle</p>
           </div>
         </div>
       </div>

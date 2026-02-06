@@ -189,7 +189,7 @@ const App: React.FC = () => {
                      className="w-6 h-6 object-contain"
                    />
                  </div>
-                 <span className="font-bold text-lg tracking-tight">AgroTech</span>
+                 <span className="font-bold text-lg tracking-tight">Gestão Safra</span>
               </div>
               <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
                  {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
