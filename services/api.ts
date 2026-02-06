@@ -1,57 +1,156 @@
-import { Customer, Region } from '../types';
-import { MOCK_CUSTOMERS } from './mockData';
-
-const API_URL = "https://arabella-pulverable-davon.ngrok-free.dev/api/Clientes?nome_fixo=Clientes&page=1&limit=1000&format=json&api_key=a4d8c7f12e3b4c9a9f6e9e2a1b4d7c8f2a3e6d1f8b9c0a2e5f7a8d9c3e4b";
+import { Customer, HarvestRecord, Crop } from '../types';
+import { supabase } from '../lib/supabase';
 
 export const fetchCustomers = async (): Promise<Customer[]> => {
   try {
-    // Adiciona Timeout de 5 segundos para evitar hang
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('name', { ascending: true });
 
-    const response = await fetch(API_URL, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.warn(`API Indisponível (${response.status}). Utilizando dados locais.`);
-      return MOCK_CUSTOMERS;
-    }
-    
-    const json = await response.json();
-    
-    // Tenta identificar onde está a lista de dados (data, items, ou raiz)
-    const list = Array.isArray(json) ? json : (json.data || json.items || []);
-
-    if (!list || list.length === 0) {
-        return MOCK_CUSTOMERS;
+    if (error) {
+      console.error('Error fetching customers:', error);
+      return [];
     }
 
-    return list.map((item: any) => ({
-      id: String(item.id || item.Id || item.codigo || item.Codigo || Math.random()),
-      name: item.RazaoSocial || item.razao_social || item.nome || item.Nome || "Nome Desconhecido",
-      tradeName: item.NomeFantasia || item.nome_fantasia || item.tradeName || item.Fantasia || item.RazaoSocial || "",
-      regional: mapRegional(item.Regional || item.regional),
-      managerName: item.Gerente || item.gerente || item.Manager || "",
-      sellerName: item.Vendedor || item.vendedor || item.Seller || "",
-      city: item.Cidade || item.cidade || item.City || "",
-      state: item.UF || item.uf || item.State || ""
+    return data.map(customer => ({
+      id: customer.id,
+      name: customer.name,
+      tradeName: customer.trade_name,
+      regional: customer.regional as any,
+      managerName: customer.manager_name,
+      sellerName: customer.seller_name,
+      city: customer.city,
+      state: customer.state
     }));
   } catch (error) {
-    // Silencia o erro 'Failed to fetch' tratando como modo offline
-    console.warn("Modo Offline: API não acessível. Carregando dados de demonstração.");
-    return MOCK_CUSTOMERS;
+    console.error('Error fetching customers:', error);
+    return [];
   }
 };
 
-const mapRegional = (val: string): Region => {
-  if (!val) return Region.CENTRO_OESTE;
-  
-  const normalized = String(val).toUpperCase().trim();
-  
-  if (normalized.includes('SUL')) return Region.SUL;
-  if (normalized.includes('NORDESTE')) return Region.NORDESTE;
-  if (normalized.includes('NORTE')) return Region.NORTE;
-  if (normalized.includes('SUDESTE')) return Region.SUDESTE;
-  
-  return Region.CENTRO_OESTE;
+export const fetchCrops = async (): Promise<Crop[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('crops')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching crops:', error);
+      return [];
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error fetching crops:', error);
+    return [];
+  }
+};
+
+export const fetchHarvestRecords = async (): Promise<HarvestRecord[]> => {
+  try {
+    const { data: records, error } = await supabase
+      .from('harvest_records')
+      .select(`
+        *,
+        visits:technical_visits(*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching harvest records:', error);
+      return [];
+    }
+
+    return records.map(record => ({
+      recordNumber: record.record_number,
+      submissionDate: record.submission_date,
+      status: record.status as any,
+      customerId: record.customer_id || 'MANUAL',
+      customerName: record.customer_name,
+      propertyName: record.property_name,
+      locationUrl: record.location_url,
+      cropId: record.crop_id,
+      totalArea: parseFloat(record.total_area),
+      plantedArea: parseFloat(record.planted_area),
+      registrationNumber: record.registration_number,
+      cprfCoordinates: record.cprf_coordinates,
+      regional: record.regional,
+      managerName: record.manager_name,
+      sellerName: record.seller_name,
+      city: record.city,
+      state: record.state,
+      visits: (record.visits || []).map((visit: any) => ({
+        id: visit.id,
+        date: visit.visit_date,
+        stage: visit.stage,
+        opinion: visit.opinion,
+        author: visit.author
+      }))
+    }));
+  } catch (error) {
+    console.error('Error fetching harvest records:', error);
+    return [];
+  }
+};
+
+export const saveHarvestRecord = async (record: HarvestRecord): Promise<HarvestRecord | null> => {
+  try {
+    const { data: savedRecord, error: recordError } = await supabase
+      .from('harvest_records')
+      .insert({
+        record_number: record.recordNumber,
+        customer_id: null,
+        customer_name: record.customerName,
+        property_name: record.propertyName,
+        location_url: record.locationUrl,
+        crop_id: record.cropId,
+        total_area: record.totalArea,
+        planted_area: record.plantedArea,
+        registration_number: record.registrationNumber,
+        cprf_coordinates: record.cprfCoordinates,
+        regional: record.regional,
+        manager_name: record.managerName,
+        seller_name: record.sellerName,
+        city: record.city,
+        state: record.state,
+        status: 'PENDING',
+        submission_date: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (recordError) {
+      console.error('Error saving harvest record:', recordError);
+      return null;
+    }
+
+    if (record.visits && record.visits.length > 0) {
+      const visitsToInsert = record.visits.map(visit => ({
+        harvest_record_id: savedRecord.id,
+        visit_date: visit.date,
+        stage: visit.stage,
+        opinion: visit.opinion,
+        author: visit.author
+      }));
+
+      const { error: visitsError } = await supabase
+        .from('technical_visits')
+        .insert(visitsToInsert);
+
+      if (visitsError) {
+        console.error('Error saving technical visits:', visitsError);
+      }
+    }
+
+    return {
+      ...record,
+      submissionDate: savedRecord.submission_date,
+      status: savedRecord.status as any
+    };
+  } catch (error) {
+    console.error('Error saving harvest record:', error);
+    return null;
+  }
 };

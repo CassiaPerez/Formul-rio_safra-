@@ -1,33 +1,48 @@
 import React, { useState } from 'react';
 import { Lock, User, KeyRound, ShieldCheck } from 'lucide-react';
-import { Input } from './Input';
+import { supabase } from '../lib/supabase';
 
 interface AdminLoginProps {
   onLoginSuccess: () => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulating API verification delay
-    setTimeout(() => {
-      // Hardcoded credentials for demonstration
-      // In production, this would validate against a backend API
-      if (username === 'admin' && password === 'admin') {
-        onLoginSuccess();
-      } else {
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
         setError('Credenciais inválidas. Tente novamente.');
         setIsLoading(false);
+        return;
       }
-    }, 800);
+
+      const isAdmin = data.user?.user_metadata?.is_admin === true;
+
+      if (!isAdmin) {
+        await supabase.auth.signOut();
+        setError('Acesso negado. Esta área é restrita para administradores.');
+        setIsLoading(false);
+        return;
+      }
+
+      onLoginSuccess();
+    } catch (err) {
+      setError('Erro ao fazer login. Tente novamente.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,10 +82,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
                 <User size={18} />
               </div>
               <input
-                type="text"
-                placeholder="Usuário"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-agro-500 focus:ring-agro-500 sm:text-sm px-3 py-3 border bg-white text-gray-900"
                 autoFocus
               />
@@ -92,17 +107,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
 
           <button
             type="submit"
-            disabled={isLoading || !username || !password}
+            disabled={isLoading || !email || !password}
             className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-agro-700 hover:bg-agro-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-agro-500 transition-all ${
               isLoading ? 'opacity-70 cursor-wait' : ''
             }`}
           >
             {isLoading ? 'Verificando...' : 'Entrar no Painel'}
           </button>
-          
+
           <div className="text-center">
             <p className="text-xs text-gray-400">
-              Credenciais padrão: admin / admin
+              Email: admin@agrotech.com / Senha: Admin@2024
             </p>
           </div>
         </form>

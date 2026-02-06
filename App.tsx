@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, HarvestRecord, TechnicalVisit } from './types';
-import { MOCK_CROPS, MOCK_SUBMITTED_RECORDS, generateRecordId } from './services/mockData';
-import { fetchCustomers } from './services/api';
+import { generateRecordId } from './services/mockData';
+import { fetchCustomers, fetchCrops, fetchHarvestRecords, saveHarvestRecord } from './services/api';
 import { Input, Select } from './components/Input';
 import { HistorySection } from './components/HistorySection';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
 import { Sidebar } from './components/Sidebar';
-import { MapPin, Save, Building2, Map, Share2, Menu, X, Sprout, Layout } from 'lucide-react';
+import { MapPin, Save, Building2, Map, Share2, Menu, X, Sprout } from 'lucide-react';
+import { supabase } from './lib/supabase';
 
 // Initial empty state for new form
 const INITIAL_RECORD: HarvestRecord = {
@@ -39,25 +40,47 @@ const App: React.FC = () => {
 
   // Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
-  
+  const [crops, setCrops] = useState<{ id: string; name: string }[]>([]);
+
   // Form State
   const [record, setRecord] = useState<HarvestRecord>(INITIAL_RECORD);
   const [isLoadingLoc, setIsLoadingLoc] = useState(false);
   const [isLoadingCprf, setIsLoadingCprf] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Validation State (Mocked Database)
-  const [submittedRecords, setSubmittedRecords] = useState<HarvestRecord[]>(MOCK_SUBMITTED_RECORDS);
+  // Validation State
+  const [submittedRecords, setSubmittedRecords] = useState<HarvestRecord[]>([]);
 
   useEffect(() => {
     setRecord(prev => ({ ...prev, recordNumber: generateRecordId() }));
-    
+
     const loadData = async () => {
-      const data = await fetchCustomers();
-      setCustomers(data);
+      const [customersData, cropsData, recordsData] = await Promise.all([
+        fetchCustomers(),
+        fetchCrops(),
+        fetchHarvestRecords()
+      ]);
+      setCustomers(customersData);
+      setCrops(cropsData);
+      setSubmittedRecords(recordsData);
     };
-    
+
     loadData();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      (async () => {
+        if (session?.user) {
+          const isAdmin = session.user.user_metadata?.is_admin === true;
+          setIsAdminAuthenticated(isAdmin);
+        } else {
+          setIsAdminAuthenticated(false);
+        }
+      })();
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const handleRecordChange = (field: keyof HarvestRecord, value: string | number) => {
@@ -100,34 +123,46 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!record.customerName || !record.cropId) {
       alert("Por favor, preencha o Nome do Cliente e a Cultura.");
       return;
     }
 
     setSaveStatus('saving');
-    
-    setTimeout(() => {
+
+    try {
       const newRecord = {
         ...record,
         customerId: 'MANUAL',
         status: 'PENDING' as const,
         submissionDate: new Date().toISOString()
       };
-      
-      setSubmittedRecords(prev => [newRecord, ...prev]);
-      setSaveStatus('saved');
-      
-      setTimeout(() => {
+
+      const savedRecord = await saveHarvestRecord(newRecord);
+
+      if (savedRecord) {
+        setSubmittedRecords(prev => [savedRecord, ...prev]);
+        setSaveStatus('saved');
+
+        setTimeout(() => {
+          setSaveStatus('idle');
+          setRecord({ ...INITIAL_RECORD, recordNumber: generateRecordId() });
+          alert("Registro enviado para validação com sucesso!");
+        }, 1500);
+      } else {
         setSaveStatus('idle');
-        setRecord({ ...INITIAL_RECORD, recordNumber: generateRecordId() });
-        alert("Registro enviado para validação com sucesso!");
-      }, 1500);
-    }, 1500);
+        alert("Erro ao salvar registro. Tente novamente.");
+      }
+    } catch (error) {
+      console.error('Error saving record:', error);
+      setSaveStatus('idle');
+      alert("Erro ao salvar registro. Tente novamente.");
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setIsAdminAuthenticated(false);
     setCurrentView('form');
   };
@@ -223,10 +258,10 @@ const App: React.FC = () => {
                 {!isAdminAuthenticated ? (
                   <AdminLogin onLoginSuccess={() => setIsAdminAuthenticated(true)} />
                 ) : (
-                  <AdminDashboard 
+                  <AdminDashboard
                     records={submittedRecords}
                     customers={customers}
-                    crops={MOCK_CROPS}
+                    crops={crops}
                   />
                 )}
               </>
@@ -326,7 +361,7 @@ const App: React.FC = () => {
 
                       <Select
                         label="Cultura"
-                        options={MOCK_CROPS.map(c => ({ value: c.id, label: c.name }))}
+                        options={crops.map(c => ({ value: c.id, label: c.name }))}
                         value={record.cropId}
                         onChange={(e) => handleRecordChange('cropId', e.target.value)}
                       />
