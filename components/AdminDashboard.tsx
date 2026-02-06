@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { HarvestRecord, Crop, Customer, RecordStatus } from '../types';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Search, 
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Search,
   Download,
   Calendar,
-  Filter
+  Filter,
+  Image as ImageIcon,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -19,6 +22,7 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ records, customers, crops }) => {
   const [filterStatus, setFilterStatus] = useState<RecordStatus | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
 
   // Helper to resolve name: Check manual name first, then ID lookup
   const getCustomerName = (record: HarvestRecord) => {
@@ -137,46 +141,100 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ records, custome
                         <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Local</th>
                         <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Cultura</th>
                         <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Área (ha)</th>
+                        <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fotos</th>
                         <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        <th className="px-8 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider"></th>
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-50">
                     {filteredRecords.length === 0 ? (
                         <tr>
-                            <td colSpan={6} className="px-6 py-16 text-center text-slate-500 flex flex-col items-center">
-                                <Search size={48} className="text-slate-200 mb-4"/>
-                                <p className="font-medium">Nenhum registro encontrado.</p>
-                                <p className="text-sm">Tente ajustar seus filtros de busca.</p>
+                            <td colSpan={8} className="px-6 py-16 text-center text-slate-500">
+                                <div className="flex flex-col items-center">
+                                    <Search size={48} className="text-slate-200 mb-4"/>
+                                    <p className="font-medium">Nenhum registro encontrado.</p>
+                                    <p className="text-sm">Tente ajustar seus filtros de busca.</p>
+                                </div>
                             </td>
                         </tr>
                     ) : (
                         filteredRecords.map((record) => (
-                            <tr key={record.recordNumber} className="hover:bg-slate-50/80 transition-colors group">
-                                <td className="px-8 py-5 whitespace-nowrap">
-                                    <div className="text-sm font-bold text-agro-900 group-hover:text-agro-600 transition-colors">{record.recordNumber}</div>
-                                    <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
-                                        <Calendar size={10} />
-                                        {new Date(record.submissionDate || '').toLocaleDateString('pt-BR')}
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    <div className="text-sm font-bold text-slate-800">{getCustomerName(record)}</div>
-                                    <div className="text-xs text-slate-500 mt-0.5">{record.propertyName}</div>
-                                </td>
-                                <td className="px-8 py-5 whitespace-nowrap">
-                                    <div className="text-sm text-slate-700">{record.city}</div>
-                                    <div className="text-xs text-slate-400">{record.state}</div>
-                                </td>
-                                <td className="px-8 py-5 whitespace-nowrap text-sm text-slate-600 font-medium">
-                                    {getCropName(record.cropId)}
-                                </td>
-                                <td className="px-8 py-5 whitespace-nowrap text-sm text-slate-600">
-                                    {record.plantedArea}
-                                </td>
-                                <td className="px-8 py-5 whitespace-nowrap">
-                                    <StatusBadge status={record.status} />
-                                </td>
-                            </tr>
+                            <React.Fragment key={record.recordNumber}>
+                                <tr className="hover:bg-slate-50/80 transition-colors group">
+                                    <td className="px-8 py-5 whitespace-nowrap">
+                                        <div className="text-sm font-bold text-agro-900 group-hover:text-agro-600 transition-colors">{record.recordNumber}</div>
+                                        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+                                            <Calendar size={10} />
+                                            {new Date(record.submissionDate || '').toLocaleDateString('pt-BR')}
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="text-sm font-bold text-slate-800">{getCustomerName(record)}</div>
+                                        <div className="text-xs text-slate-500 mt-0.5">{record.propertyName}</div>
+                                    </td>
+                                    <td className="px-8 py-5 whitespace-nowrap">
+                                        <div className="text-sm text-slate-700">{record.city}</div>
+                                        <div className="text-xs text-slate-400">{record.state}</div>
+                                    </td>
+                                    <td className="px-8 py-5 whitespace-nowrap text-sm text-slate-600 font-medium">
+                                        {getCropName(record.cropId)}
+                                    </td>
+                                    <td className="px-8 py-5 whitespace-nowrap text-sm text-slate-600">
+                                        {record.plantedArea}
+                                    </td>
+                                    <td className="px-8 py-5 whitespace-nowrap">
+                                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                                            <ImageIcon size={16} className="text-slate-400" />
+                                            <span className="font-medium">{record.images?.length || 0}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5 whitespace-nowrap">
+                                        <StatusBadge status={record.status} />
+                                    </td>
+                                    <td className="px-8 py-5 whitespace-nowrap text-right">
+                                        {record.images && record.images.length > 0 && (
+                                            <button
+                                                onClick={() => setExpandedRecord(expandedRecord === record.recordNumber ? null : record.recordNumber)}
+                                                className="text-agro-600 hover:text-agro-800 transition-colors"
+                                            >
+                                                {expandedRecord === record.recordNumber ? (
+                                                    <ChevronUp size={20} />
+                                                ) : (
+                                                    <ChevronDown size={20} />
+                                                )}
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                                {expandedRecord === record.recordNumber && record.images && record.images.length > 0 && (
+                                    <tr>
+                                        <td colSpan={8} className="px-8 py-6 bg-slate-50/50">
+                                            <div className="space-y-3">
+                                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                                    <ImageIcon size={16} className="text-agro-600" />
+                                                    Fotos do Acompanhamento ({record.images.length})
+                                                </h4>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                                    {record.images.map((image) => (
+                                                        <div key={image.id} className="group relative">
+                                                            <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 bg-slate-100 hover:border-agro-500 transition-all">
+                                                                <img
+                                                                    src={image.url}
+                                                                    alt={image.file_name}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                            <div className="mt-1 text-xs text-slate-500 truncate" title={image.file_name}>
+                                                                {image.file_name}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
                         ))
                     )}
                 </tbody>

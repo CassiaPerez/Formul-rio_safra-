@@ -8,6 +8,7 @@ import { HistorySection } from './components/HistorySection';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
 import { Sidebar } from './components/Sidebar';
+import { ImageUpload } from './components/ImageUpload';
 import { MapPin, Save, Building2, Map, Share2, Menu, X, Loader2 } from 'lucide-react';
 
 // Initial empty state for new form
@@ -45,6 +46,7 @@ const App: React.FC = () => {
   
   // Form State
   const [record, setRecord] = useState<HarvestRecord>(INITIAL_RECORD);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isLoadingLoc, setIsLoadingLoc] = useState(false);
   const [isLoadingCprf, setIsLoadingCprf] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -126,7 +128,7 @@ const App: React.FC = () => {
     }
 
     setSaveStatus('saving');
-    
+
     try {
       const newRecord = {
         ...record,
@@ -134,16 +136,16 @@ const App: React.FC = () => {
         submissionDate: new Date().toISOString()
       };
 
-      await recordService.createRecord(newRecord);
-      
-      // Update local list
+      await recordService.createRecord(newRecord, selectedImages);
+
       await refreshRecords();
-      
+
       setSaveStatus('saved');
-      
+
       setTimeout(() => {
         setSaveStatus('idle');
         setRecord({ ...INITIAL_RECORD, recordNumber: generateRecordId() });
+        setSelectedImages([]);
         alert("Registro enviado para validação com sucesso!");
       }, 1500);
 
@@ -433,6 +435,20 @@ const App: React.FC = () => {
                       onAddVisit={handleAddVisit}
                       currentUser={record.sellerName || 'Técnico Atual'}
                   />
+
+                  {/* Section 4: Image Upload */}
+                  <section className="bg-slate-50/50 p-8 rounded-2xl border border-slate-100">
+                    <h3 className="text-xl font-bold text-agro-900 mb-8 flex items-center gap-3">
+                      <div className="bg-white p-2 rounded-lg shadow-sm text-agro-600 border border-slate-100">
+                        <Map size={22} />
+                      </div>
+                      Fotos do Acompanhamento
+                    </h3>
+                    <ImageUpload
+                      onImagesChange={setSelectedImages}
+                      maxImages={5}
+                    />
+                  </section>
 
                 </div>
 

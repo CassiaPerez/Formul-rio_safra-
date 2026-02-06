@@ -32,7 +32,7 @@ const mapVisitToDB = (visit: TechnicalVisit, recordNumber: string) => ({
   author: visit.author
 });
 
-const mapRecordFromDB = (data: any, visits: any[]): HarvestRecord => ({
+const mapRecordFromDB = (data: any, visits: any[], images?: any[]): HarvestRecord => ({
   recordNumber: data.record_number,
   submissionDate: data.submission_date,
   status: data.status as RecordStatus,
@@ -52,6 +52,13 @@ const mapRecordFromDB = (data: any, visits: any[]): HarvestRecord => ({
     opinion: v.opinion,
     author: v.author
   })),
+  images: images?.map(img => ({
+    id: img.id,
+    storage_path: img.storage_path,
+    file_name: img.file_name,
+    file_size: img.file_size,
+    url: supabase.storage.from('harvest-images').getPublicUrl(img.storage_path).data.publicUrl
+  })),
   regional: data.regional,
   managerName: data.manager_name,
   sellerName: data.seller_name,
@@ -70,9 +77,8 @@ export const recordService = {
     if (recordsError) throw recordsError;
     if (!recordsData) return [];
 
-    // Fetch visits for all these records
-    // Ideally we would use a join, but for simplicity/flexibility with types:
     const recordNumbers = recordsData.map(r => r.record_number);
+
     const { data: visitsData, error: visitsError } = await supabase
       .from('technical_visits')
       .select('*')
@@ -80,29 +86,77 @@ export const recordService = {
 
     if (visitsError) throw visitsError;
 
+    const recordIds = recordsData.map(r => r.id);
+    const { data: imagesData, error: imagesError } = await supabase
+      .from('harvest_images')
+      .select('*')
+      .in('harvest_record_id', recordIds);
+
+    if (imagesError) console.error('Error loading images:', imagesError);
+
     return recordsData.map(record => {
       const recordVisits = visitsData?.filter(v => v.record_number === record.record_number) || [];
-      return mapRecordFromDB(record, recordVisits);
+      const recordImages = imagesData?.filter(img => img.harvest_record_id === record.id) || [];
+      return mapRecordFromDB(record, recordVisits, recordImages);
     });
   },
 
-  async createRecord(record: HarvestRecord): Promise<void> {
-    // 1. Insert Record
+  async createRecord(record: HarvestRecord, imageFiles?: File[]): Promise<string> {
     const dbRecord = mapRecordToDB(record);
-    const { error: recordError } = await supabase
+    const { data: insertedRecord, error: recordError } = await supabase
       .from('harvest_records')
-      .insert(dbRecord);
+      .insert(dbRecord)
+      .select()
+      .single();
 
     if (recordError) throw recordError;
+    if (!insertedRecord) throw new Error('Failed to create record');
 
-    // 2. Insert Visits
     if (record.visits.length > 0) {
       const dbVisits = record.visits.map(v => mapVisitToDB(v, record.recordNumber));
       const { error: visitsError } = await supabase
         .from('technical_visits')
         .insert(dbVisits);
-      
+
       if (visitsError) throw visitsError;
+    }
+
+    if (imageFiles && imageFiles.length > 0) {
+      await this.uploadImages(insertedRecord.id, imageFiles);
+    }
+
+    return insertedRecord.id;
+  },
+
+  async uploadImages(recordId: string, files: File[]): Promise<void> {
+    for (const file of files) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${recordId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('harvest-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        continue;
+      }
+
+      const { error: dbError } = await supabase
+        .from('harvest_images')
+        .insert({
+          harvest_record_id: recordId,
+          storage_path: fileName,
+          file_name: file.name,
+          file_size: file.size
+        });
+
+      if (dbError) {
+        console.error('Error saving image metadata:', dbError);
+      }
     }
   },
 

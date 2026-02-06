@@ -30,6 +30,14 @@ export interface TechnicalVisit {
   author: string; // Nome do técnico/vendedor que registrou
 }
 
+export interface HarvestImage {
+  id: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number;
+  url?: string;
+}
+
 export type RecordStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface HarvestRecord {
@@ -46,6 +54,7 @@ export interface HarvestRecord {
   registrationNumber: string; // Matrícula da Área
   cprfCoordinates: string; // Lat, Long da CPRF
   visits: TechnicalVisit[];
+  images?: HarvestImage[];
   // Manual fields for snapshot
   regional: string;
   managerName: string;
