@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, User, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
+import { User, KeyRound, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 interface AdminLoginProps {
@@ -55,8 +55,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
            </div>
            
            <div className="relative z-10 flex flex-col items-center">
-             <div className="bg-white/20 p-3 rounded-full mb-3 backdrop-blur-sm">
-                <ShieldCheck className="text-white h-10 w-10" />
+             <div className="bg-white p-3 rounded-xl mb-3 shadow-lg">
+                <img
+                  src="/gcf_logo_01_(1).png"
+                  alt="GCF Logo"
+                  className="h-12 w-12 object-contain"
+                />
              </div>
              <h2 className="text-2xl font-bold text-white">Acesso Administrativo</h2>
              <p className="text-agro-200 text-sm mt-1">Área restrita para gestão de safra</p>

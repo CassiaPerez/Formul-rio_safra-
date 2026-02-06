@@ -8,7 +8,7 @@ import { HistorySection } from './components/HistorySection';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
 import { Sidebar } from './components/Sidebar';
-import { MapPin, Save, Building2, Map, Share2, Menu, X, Sprout, Loader2 } from 'lucide-react';
+import { MapPin, Save, Building2, Map, Share2, Menu, X, Loader2 } from 'lucide-react';
 
 // Initial empty state for new form
 const INITIAL_RECORD: HarvestRecord = {
@@ -182,8 +182,12 @@ const App: React.FC = () => {
         <header className="md:hidden bg-agro-950 text-white shadow-md sticky top-0 z-40">
            <div className="px-4 py-3 flex justify-between items-center">
               <div className="flex items-center gap-3">
-                 <div className="bg-agro-600 p-1.5 rounded-lg">
-                   <Sprout size={20} className="text-white" />
+                 <div className="bg-white p-1.5 rounded-lg">
+                   <img
+                     src="/gcf_logo_01_(1).png"
+                     alt="GCF Logo"
+                     className="w-6 h-6 object-contain"
+                   />
                  </div>
                  <span className="font-bold text-lg tracking-tight">AgroTech</span>
               </div>

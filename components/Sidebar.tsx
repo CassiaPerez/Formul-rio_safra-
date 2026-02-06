@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sprout, LayoutDashboard, PenTool, LogOut, User, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, PenTool, LogOut, User, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   currentView: 'form' | 'admin';
@@ -40,8 +40,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand */}
       <div className="p-8 pb-6">
         <div className="flex items-center gap-3.5">
-          <div className="bg-gradient-to-br from-agro-500 to-agro-700 p-2.5 rounded-xl text-white shadow-lg shadow-agro-500/25">
-             <Sprout size={26} />
+          <div className="bg-white p-2 rounded-xl shadow-lg">
+             <img
+               src="/gcf_logo_01_(1).png"
+               alt="GCF Logo"
+               className="w-10 h-10 object-contain"
+             />
           </div>
           <div>
             <h1 className="text-xl font-bold leading-tight tracking-tight text-white">AgroTech</h1>
